@@ -11,6 +11,7 @@ import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.widget.TextView;
 
 import com.amazonaws.auth.CognitoCachingCredentialsProvider;
 import com.amazonaws.mobileconnectors.dynamodbv2.dynamodbmapper.DynamoDBAttribute;
@@ -25,13 +26,26 @@ import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 
 public class StartFlick extends AppCompatActivity{
+
+    TextView latitude;
+    TextView longitude;
+    String lat, lon;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_start_flick);
+
+        MapsActivity mapsActivity = new MapsActivity();
+        latitude = mapsActivity.latitude;
+        longitude = mapsActivity.longitude;
+
+        latitude = (TextView) findViewById(R.id.latitudetest);
+        longitude = (TextView) findViewById(R.id.longitudetest);
+
+        latitude.setText(lat);
+        longitude.setText(lon);
     }
-
-
 }
 
 

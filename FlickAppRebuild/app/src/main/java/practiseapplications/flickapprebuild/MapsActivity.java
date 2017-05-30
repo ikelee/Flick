@@ -10,20 +10,31 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Build;
 import android.support.annotation.MainThread;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 import android.support.v4.content.ContextCompat;
+import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiActivity;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.MapFragment;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.UiSettings;
@@ -36,40 +47,35 @@ import com.amazonaws.services.dynamodbv2.*;
 import com.amazonaws.mobileconnectors.dynamodbv2.dynamodbmapper.*;
 import com.amazonaws.services.dynamodbv2.model.*;
 
-public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
+public class MapsActivity extends AppCompatActivity implements OnMapReadyCallback,
+        GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
 
     private GoogleMap mMap;
     private UiSettings mUiSettings;
-    private GoogleApiClient mGoogleApiClient;
+    protected GoogleApiClient mGoogleApiClient;
     private Button button;
-    Double latitude;
-    Double longitude;
-    TextView test;
+    public TextView latitude;
+    public TextView longitude;
+    String lat, lon;
+    LocationManager locationManager;
+    MapFragment mapFragment;
+    boolean connection = false;
+
+    Location mLastLocation;
+    LocationRequest mLocationRequest;
 
     public static final int MY_PERMISSIONS_REQUEST_LOCATION = 99;
 
-    final LocationListener locationListener = new LocationListener() {
-        @Override
-        public void onLocationChanged(Location location) {
-            longitude = location.getLongitude();
-            latitude = location.getLatitude();
-        }
 
-        @Override
-        public void onStatusChanged(String provider, int status, Bundle extras) {
-
-        }
-
-        @Override
-        public void onProviderEnabled(String provider) {
-
-        }
-
-        @Override
-        public void onProviderDisabled(String provider) {
-
-        }
-    };
+    //This builds the API Client.
+    protected synchronized void buildGoogleApiClient() {
+        Toast.makeText(this, "buildGoogleApiClient", Toast.LENGTH_SHORT).show();
+        mGoogleApiClient = new GoogleApiClient.Builder(this)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .addApi(LocationServices.API)
+                .build();
+    }
 
 
     @Override
@@ -77,14 +83,21 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
 
+        //This checks for permission, if that wasn't obvious enough.
         if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             checkLocationPermission();
         }
-        // Obtain the SupportMapFragment and get notified when the map is ready to be used.
-        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
+
+        //This builds the API client.
+        buildGoogleApiClient();
+
+
+        //This part actually initializes the map, and is not glitchy.
+        mapFragment = (MapFragment) getFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
 
+        //This part takes you to "StartFlick page, and is also not glitchy.
         button = (Button) findViewById(R.id.button);
         button.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
@@ -93,9 +106,14 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
         });
 
-        test = (TextView)findViewById(R.id.textfortest);
+
+        //This is just for testing purposes. Sike not anymore.
+        latitude = (TextView) findViewById(R.id.latitude);
+        longitude = (TextView) findViewById(R.id.longitude);
+
     }
 
+    //Calls the Droid system to uplink the Death Star Blueprint. Also, the permission.
     private void checkLocationPermission() {
         if (ContextCompat.checkSelfPermission(this,
                 Manifest.permission.ACCESS_FINE_LOCATION)
@@ -107,43 +125,100 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     }
 
-
-    /**
-     * Manipulates the map once available.
-     * This callback is triggered when the map is ready to be used.
-     * This is where we can add markers or lines, add listeners or move the camera. In this case,
-     * we just add a marker near Sydney, Australia.
-     * If Google Play services is not installed on the device, the user will be prompted to install
-     * it inside the SupportMapFragment. This method will only be triggered once the user has
-     * installed Google Play services and returned to the app.
-     */
-    @Override
-    public void onMapReady(GoogleMap googleMap) {
-        mMap = googleMap;
-        mUiSettings = mMap.getUiSettings();
-
-
-        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (ContextCompat.checkSelfPermission(this,
-                    Manifest.permission.ACCESS_FINE_LOCATION)
-                    == PackageManager.PERMISSION_GRANTED) {
-                mMap.setMyLocationEnabled(true);
-            }
-        }
-        else {
-            mMap.setMyLocationEnabled(true);
-        }
-
-        LocationManager lm = (LocationManager)getSystemService(Context.LOCATION_SERVICE);
-        Location location = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-        longitude = location.getLongitude();
-        latitude = location.getLatitude();
-
-        lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000, 10, locationListener);
+    //starts the API client.
+    protected void onStart() {
+        mGoogleApiClient.connect();
+        super.onStart();
     }
 
-    public void onLocationChanged(GoogleMap googleMap) {
-        mMap = googleMap;
+    //Stops the API client.
+    protected void onStop() {
+        mGoogleApiClient.disconnect();
+        super.onStop();
+    }
+
+
+    //Happens when map is ready.
+    @Override
+    public void onMapReady(GoogleMap map) {
+        mUiSettings = map.getUiSettings();
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+            return;
+        }
+        map.setMyLocationEnabled(true);
+        Toast.makeText(this,"mapReady",Toast.LENGTH_SHORT).show();
+
+    }
+
+    //Happens when API connects. Still unsure whether this and the map getting ready is synchronous or asynchronous.
+    @Override
+    public void onConnected(Bundle bundle) {
+        Toast.makeText(this, "OnConnected", Toast.LENGTH_SHORT).show();
+
+        mLocationRequest = LocationRequest.create();
+        mLocationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
+        mLocationRequest.setMaxWaitTime(5000);
+        mLocationRequest.setInterval(10000);
+
+        try {
+            LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
+
+            mLastLocation = LocationServices.FusedLocationApi.getLastLocation(
+                    mGoogleApiClient);
+            updateUI();
+        }
+        catch (SecurityException e)
+        {
+            Log.e("LocatonUpdate",e+" ");
+        }
+        if (mLastLocation != null) {
+            lat = String.valueOf(mLastLocation.getLatitude());
+            lon = String.valueOf(mLastLocation.getLongitude());
+        }
+        updateUI();
+
+       /* CameraUpdate center =
+                CameraUpdateFactory.newLatLng(new LatLng(mLastLocation.getLatitude(),
+                        mLastLocation.getLongitude()));
+        CameraUpdate zoom = CameraUpdateFactory.zoomTo(15);
+
+        mMap.moveCamera(center);
+        mMap.animateCamera(zoom);*/
+    }
+
+    @Override
+    public void onConnectionSuspended(int i) {
+        Toast.makeText(this,"onConnectionSuspended",Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+        Toast.makeText(this,"onConnectionFailed",Toast.LENGTH_SHORT).show();
+        buildGoogleApiClient();
+    }
+
+    //Is called when the user moves around.
+    public void onLocationChanged(Location location) {
+
+        Toast.makeText(this,"Location Changed",Toast.LENGTH_SHORT).show();
+        latitude.setText(String.valueOf(location.getLatitude()));
+        longitude.setText(String.valueOf(location.getLongitude()));
+        updateUI();
+    }
+
+    //Updates my testing UI up top. And, moves camera to current location.
+    void updateUI() {
+        latitude.setText(lat);
+        longitude.setText(lon);
 
     }
 }
+
+
