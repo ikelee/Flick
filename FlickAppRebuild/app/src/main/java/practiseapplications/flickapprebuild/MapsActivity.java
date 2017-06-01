@@ -26,6 +26,7 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.facebook.login.LoginManager;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiActivity;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -54,9 +55,10 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
     private UiSettings mUiSettings;
     protected GoogleApiClient mGoogleApiClient;
     private Button button;
+    private Button logOut;
     public TextView latitude;
     public TextView longitude;
-    String lat, lon;
+    public static String lat, lon;
     LocationManager locationManager;
     MapFragment mapFragment;
     boolean connection = false;
@@ -102,6 +104,15 @@ public class MapsActivity extends AppCompatActivity implements OnMapReadyCallbac
         button.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 Intent i = new Intent(MapsActivity.this, StartFlick.class);
+                startActivity(i);
+            }
+        });
+
+        button = (Button) findViewById(R.id.logout);
+        button.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                LoginManager.getInstance().logOut();
+                Intent i = new Intent(MapsActivity.this, FacebookLogin.class);
                 startActivity(i);
             }
         });
